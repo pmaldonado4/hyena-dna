@@ -1,0 +1,17 @@
+_name_: multispecies
+bed_file: null  # Set to null unless you have BED files for specific regions of interest
+fasta_file: null  # You may not need this if your dataset loader handles species-specific files
+dataset_name: multispecies  # This is the name to identify your dataset
+tokenizer_name: char  # Assuming you're using character-level tokenization
+cache_dir: null  # Set this if you have a specific directory for caching
+max_length: 32000  # Adjusted for your dataset
+add_eos: True  # Add an end-of-sequence token
+batch_size: 128  # Per GPU, adjust based on your GPU memory and dataset
+batch_size_eval: ${eval:${.batch_size} * 2}  # Evaluation batch size is double the training batch size
+num_workers: 12  # Number of workers for data loading; adjust based on your system
+shuffle: True  # Shuffle the data during training
+pin_memory: True  # This can speed up data transfer to GPU
+
+# These parameters are for internal calculations and shouldn't need to change unless you modify other parameters
+__train_len: ${div_up:1_000_000_000, ${.max_length}}  # Estimate the number of training steps based on the dataset size
+__l_max: ${.max_length}  # The maximum sequence length

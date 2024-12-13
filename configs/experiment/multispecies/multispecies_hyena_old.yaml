@@ -1,0 +1,82 @@
+# @package _global_
+defaults:
+  - /pipeline: multispecies
+  - override /scheduler: cosine_warmup_timm
+
+wandb:
+  project: hyena-dna-multispecies
+  entity: pmaldonado12
+
+model:
+  _name_: lm
+  d_model: 32  # Aligning with human config
+  n_layer: 2   # Aligning with human config
+  d_inner: ${eval:4 * ${.d_model}}
+  vocab_size: 12
+  resid_dropout: 0.1  # Aligning with human config
+  embed_dropout: 0.1
+  fused_mlp: False
+  fused_dropout_add_ln: False
+  checkpoint_mixer: False
+  checkpoint_mlp: False
+  residual_in_fp32: True
+  pad_vocab_size_multiple: 8
+  layer:
+    _name_: hyena
+    emb_dim: 5  # Aligning with human config
+    filter_order: 64  # Aligning with human config
+    short_filter_order: 3
+    l_max: ${eval:${dataset.max_length}+2}
+    modulate: True
+    w: 10
+    lr: ${optimizer.lr}
+    wd: 0.0
+    lr_pos_emb: 0.0
+
+task:
+  _name_: lm
+
+trainer:
+  accelerator: gpu
+  devices: 1  # Aligning with human config
+  num_nodes: 1
+  accumulate_grad_batches: ${div_up:${train.global_batch_size}, ${eval:${trainer.devices} * ${dataset.batch_size} * ${trainer.num_nodes}}}
+  max_epochs: 100
+  precision: 16  # bf16 only for A100 GPUs
+  gradient_clip_val: 1.0
+
+dataset:
+  _name_: multispecies
+  species: ['human', 'mouse', 'lemur', 'squirrel']  # List of species
+  species_dir: "/u/pmaldonadocatala/hyena-dna/processed"
+  total_size: 100000
+  max_length: 1024  # Aligning with human config
+  max_length_val: ${dataset.max_length}
+  max_length_test: ${dataset.max_length}
+  tokenizer_name: char
+  pad_max_length: null
+  add_eos: true
+  rc_aug: false
+  num_workers: 12
+  use_fixed_len_val: false
+  replace_N_token: false
+  pad_interval: false
+  task: "next_token_pred"  # or "species_classification" depending on your goal
+loader:
+  batch_size: 32
+  num_workers: 12
+scheduler:
+  t_in_epochs: False
+  t_initial: ${eval:${div_up:${dataset.__train_len}, ${train.global_batch_size}} * ${trainer.max_epochs}}
+  warmup_lr_init: 1e-6
+  warmup_t: ${eval:${div_up:${dataset.__train_len}, ${train.global_batch_size}} * ${trainer.max_epochs} * 0.01}
+  lr_min: ${eval:0.1 * ${optimizer.lr}}
+
+optimizer:
+  lr: 6e-4  # Aligning with human config
+  weight_decay: 0.1
+
+train:
+  gpu_mem: ${eval:"round(float(__import__('subprocess').check_output('nvidia-smi -i 0 --query-gpu=memory.total --format=csv,noheader,nounits', shell=True).strip().decode()) / 1000)"}
+  seed: 2222
+  global_batch_size: 256  # Aligning with human config
